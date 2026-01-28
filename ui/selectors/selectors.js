@@ -1147,27 +1147,38 @@ export const getMarketData = (state) => {
   return state.metamask.marketData;
 };
 
-export function getAddressBook(state) {
+const getAddressBookForChain = (state) => {
   const chainId = getCurrentChainId(state);
-  if (!state.metamask.addressBook[chainId]) {
-    return [];
-  }
-  return Object.values(state.metamask.addressBook[chainId]);
-}
+  return state.metamask.addressBook?.[chainId];
+};
 
-export function getCompleteAddressBook(state) {
-  const addresses = state.metamask.addressBook;
-  const addressWithChainId = Object.entries(addresses)
-    .filter(([chainId, _]) => chainId !== '*')
-    .map(([chainId, addresse]) =>
-      Object.values(addresse).map((address) => ({
-        ...address,
-        chainId,
-      })),
-    )
-    .flat();
-  return addressWithChainId;
-}
+export const getAddressBook = createSelector(
+  getAddressBookForChain,
+  (addressBookForChain) => {
+    if (!addressBookForChain) {
+      return EMPTY_ARRAY;
+    }
+    return Object.values(addressBookForChain);
+  },
+);
+
+export const getCompleteAddressBook = createSelector(
+  (state) => state.metamask.addressBook,
+  (addresses) => {
+    if (!addresses) {
+      return EMPTY_ARRAY;
+    }
+    return Object.entries(addresses)
+      .filter(([chainId, _]) => chainId !== '*')
+      .map(([chainId, addresse]) =>
+        Object.values(addresse).map((address) => ({
+          ...address,
+          chainId,
+        })),
+      )
+      .flat();
+  },
+);
 
 export function getEnsResolutionByAddress(state, address) {
   if (state.metamask.ensResolutionsByAddress[address]) {
