@@ -38,9 +38,13 @@ export const ActivityListItem = ({
       backgroundColor={BackgroundColor.backgroundDefault}
       className={primaryClassName}
       onClick={onClick}
-      onKeyPress={(event) => {
+      role={onClick ? 'button' : undefined}
+      onKeyDown={(event) => {
         if (event.key === 'Enter') {
-          onClick();
+          onClick?.();
+        } else if (event.key === ' ') {
+          event.preventDefault();
+          onClick?.();
         }
       }}
       data-testid={dataTestId}

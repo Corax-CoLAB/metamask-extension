@@ -35,6 +35,7 @@ exports[`ActivityListItem should match snapshot with props 1`] = `
   <div
     class="mm-box activity-list-item list-item-test mm-box--padding-top-3 mm-box--padding-bottom-3 mm-box--padding-inline-4 mm-box--display-flex mm-box--gap-4 mm-box--flex-wrap-wrap mm-box--width-full mm-box--background-color-background-default"
     data-testid="test-id"
+    role="button"
     tabindex="0"
   >
     <p

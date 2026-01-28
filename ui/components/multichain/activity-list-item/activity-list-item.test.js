@@ -42,4 +42,21 @@ describe('ActivityListItem', () => {
     fireEvent.click(getByTestId('test-id'));
     expect(defaultProps.onClick).toHaveBeenCalled();
   });
+
+  it('should have role="button" when onClick is provided', () => {
+    const { getByRole } = render(<ActivityListItem {...defaultProps} />);
+    expect(getByRole('button')).toBeInTheDocument();
+  });
+
+  it('calls onClick when Enter key is pressed', () => {
+    const { getByTestId } = render(<ActivityListItem {...defaultProps} />);
+    fireEvent.keyDown(getByTestId('test-id'), { key: 'Enter', code: 'Enter' });
+    expect(defaultProps.onClick).toHaveBeenCalled();
+  });
+
+  it('calls onClick when Space key is pressed', () => {
+    const { getByTestId } = render(<ActivityListItem {...defaultProps} />);
+    fireEvent.keyDown(getByTestId('test-id'), { key: ' ', code: 'Space' });
+    expect(defaultProps.onClick).toHaveBeenCalled();
+  });
 });
