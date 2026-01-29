@@ -159,6 +159,7 @@ const generateUseSelectorRouter = (opts) => (selector) => {
 };
 
 describe('TransactionListItem', () => {
+  // Snapshot update required due to React.memo wrapper affecting component tree
   beforeAll(() => {
     useGasFeeEstimates.mockImplementation(
       () => FEE_MARKET_ESTIMATE_RETURN_VALUE,
