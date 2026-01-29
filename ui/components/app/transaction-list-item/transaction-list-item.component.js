@@ -492,4 +492,4 @@ TransactionListItem.propTypes = {
   transactionGroup: PropTypes.object.isRequired,
 };
 
-export default TransactionListItem;
+export default React.memo(TransactionListItem);
