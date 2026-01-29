@@ -1,0 +1,3 @@
+## 2026-01-29 - React.memo() triggering snapshot role attributes
+**Learning:** Wrapping components in `React.memo()` in this codebase caused unit test snapshots to generate `role="button"` attributes on list items. This behavior is unexpected as `React.memo` should be transparent to props, but may affect how `ActivityListItem` (using `Box`) or the test renderer infers roles, possibly due to `displayName` or component type changes.
+**Action:** When memoizing components, always inspect snapshot diffs carefully. If `role="button"` appears unexpectedly, verify it doesn't break accessibility or functionality, and update snapshots if the behavior is acceptable.

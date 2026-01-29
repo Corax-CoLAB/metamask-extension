@@ -27,12 +27,12 @@ import {
 } from '../../../helpers/constants/design-system';
 import { getCurrentNetwork } from '../../../selectors';
 
-export default function SmartTransactionListItem({
+const SmartTransactionListItem = ({
   smartTransaction,
   transactionGroup,
   isEarliestNonce = false,
   chainId,
-}) {
+}) => {
   const dispatch = useDispatch();
   const [cancelSwapLinkClicked, setCancelSwapLinkClicked] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -127,7 +127,7 @@ export default function SmartTransactionListItem({
       )}
     </>
   );
-}
+};
 
 SmartTransactionListItem.propTypes = {
   smartTransaction: PropTypes.object.isRequired,
@@ -135,3 +135,5 @@ SmartTransactionListItem.propTypes = {
   transactionGroup: PropTypes.object,
   chainId: PropTypes.string,
 };
+
+export default React.memo(SmartTransactionListItem);

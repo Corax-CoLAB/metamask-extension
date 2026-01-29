@@ -982,20 +982,71 @@ export default function UnifiedTransactionList({
 ///: BEGIN:ONLY_INCLUDE_IF(multichain)
 
 // Regular transaction list item for non-bridge transactions
-const MultichainTransactionListItem = ({
-  transaction,
-  networkConfig,
-  toggleShowDetails,
-}) => {
-  const t = useI18nContext();
-  const { from, to, type, timestamp, isRedeposit, title } =
-    useMultichainTransactionDisplay(transaction, networkConfig);
-  const networkLogo = MULTICHAIN_TOKEN_IMAGE_MAP[transaction.chain];
-  const statusKey = KEYRING_TRANSACTION_STATUS_KEY[transaction.status];
+const MultichainTransactionListItem = React.memo(
+  function MultichainTransactionListItem({
+    transaction,
+    networkConfig,
+    toggleShowDetails,
+  }) {
+    const t = useI18nContext();
+    const { from, to, type, timestamp, isRedeposit, title } =
+      useMultichainTransactionDisplay(transaction, networkConfig);
+    const networkLogo = MULTICHAIN_TOKEN_IMAGE_MAP[transaction.chain];
+    const statusKey = KEYRING_TRANSACTION_STATUS_KEY[transaction.status];
 
-  // A redeposit transaction is a special case where the outputs list is empty because we are sending to ourselves and only pay the fees
-  // Mainly used for consolidation transactions
-  if (isRedeposit) {
+    // A redeposit transaction is a special case where the outputs list is empty because we are sending to ourselves and only pay the fees
+    // Mainly used for consolidation transactions
+    if (isRedeposit) {
+      return (
+        <ActivityListItem
+          className="custom-class"
+          data-testid="activity-list-item"
+          onClick={() => toggleShowDetails(transaction)}
+          icon={
+            <BadgeWrapper
+              display={Display.Block}
+              badge={
+                <AvatarNetwork
+                  className="activity-tx__network-badge"
+                  data-testid="activity-tx-network-badge"
+                  size={AvatarNetworkSize.Xs}
+                  name={transaction.chain}
+                  src={networkLogo}
+                  borderColor={BackgroundColor.backgroundDefault}
+                  borderWidth={2}
+                />
+              }
+            >
+              <TransactionIcon
+                category={TransactionGroupCategory.redeposit}
+                status={statusKey}
+              />
+            </BadgeWrapper>
+          }
+          title={t('redeposit')}
+          subtitle={
+            <TransactionStatusLabel
+              date={formatTimestamp(timestamp)}
+              error={{}}
+              status={statusKey}
+              statusOnly
+            />
+          }
+        />
+      );
+    }
+
+    let { amount, unit } = to ?? {};
+    let category = type;
+    if (type === KeyringTransactionType.Swap) {
+      amount = from.amount;
+      unit = from.unit;
+    }
+
+    if (type === KeyringTransactionType.Unknown) {
+      category = TransactionGroupCategory.interaction;
+    }
+
     return (
       <ActivityListItem
         className="custom-class"
@@ -1016,16 +1067,26 @@ const MultichainTransactionListItem = ({
               />
             }
           >
-            <TransactionIcon
-              category={TransactionGroupCategory.redeposit}
-              status={statusKey}
-            />
+            <TransactionIcon category={category} status={statusKey} />
           </BadgeWrapper>
         }
-        title={t('redeposit')}
+        rightContent={
+          <Text
+            className="activity-list-item__primary-currency"
+            data-testid="transaction-list-item-primary-currency"
+            color={TextColor.textDefault}
+            variant={TextVariant.bodyMdMedium}
+            ellipsis
+            textAlign="right"
+            title="Primary Currency"
+          >
+            {amount} {unit}
+          </Text>
+        }
+        title={title}
         subtitle={
           <TransactionStatusLabel
-            date={formatTimestamp(timestamp)}
+            date={formatTimestamp(transaction.timestamp)}
             error={{}}
             status={statusKey}
             statusOnly
@@ -1033,67 +1094,8 @@ const MultichainTransactionListItem = ({
         }
       />
     );
-  }
-
-  let { amount, unit } = to ?? {};
-  let category = type;
-  if (type === KeyringTransactionType.Swap) {
-    amount = from.amount;
-    unit = from.unit;
-  }
-
-  if (type === KeyringTransactionType.Unknown) {
-    category = TransactionGroupCategory.interaction;
-  }
-
-  return (
-    <ActivityListItem
-      className="custom-class"
-      data-testid="activity-list-item"
-      onClick={() => toggleShowDetails(transaction)}
-      icon={
-        <BadgeWrapper
-          display={Display.Block}
-          badge={
-            <AvatarNetwork
-              className="activity-tx__network-badge"
-              data-testid="activity-tx-network-badge"
-              size={AvatarNetworkSize.Xs}
-              name={transaction.chain}
-              src={networkLogo}
-              borderColor={BackgroundColor.backgroundDefault}
-              borderWidth={2}
-            />
-          }
-        >
-          <TransactionIcon category={category} status={statusKey} />
-        </BadgeWrapper>
-      }
-      rightContent={
-        <Text
-          className="activity-list-item__primary-currency"
-          data-testid="transaction-list-item-primary-currency"
-          color={TextColor.textDefault}
-          variant={TextVariant.bodyMdMedium}
-          ellipsis
-          textAlign="right"
-          title="Primary Currency"
-        >
-          {amount} {unit}
-        </Text>
-      }
-      title={title}
-      subtitle={
-        <TransactionStatusLabel
-          date={formatTimestamp(transaction.timestamp)}
-          error={{}}
-          status={statusKey}
-          statusOnly
-        />
-      }
-    />
-  );
-};
+  },
+);
 
 MultichainTransactionListItem.propTypes = {
   transaction: PropTypes.object.isRequired,
