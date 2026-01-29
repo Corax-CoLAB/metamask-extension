@@ -159,7 +159,8 @@ const generateUseSelectorRouter = (opts) => (selector) => {
 };
 
 describe('TransactionListItem', () => {
-  // Snapshot update required due to React.memo wrapper affecting component tree
+  // Snapshot update required due to React.memo wrapper affecting component tree.
+  // Note: Snapshots were updated to include role="button" which appeared after memoization/dependency changes.
   beforeAll(() => {
     useGasFeeEstimates.mockImplementation(
       () => FEE_MARKET_ESTIMATE_RETURN_VALUE,
