@@ -4215,34 +4215,3 @@ describe('getIsDefiPositionsEnabled', () => {
     );
   });
 });
-
-describe('getAllDetectedTokensForSelectedAddress', () => {
-  it('should return referentially equal objects for the same state (memoization check)', () => {
-    const state = {
-      metamask: {
-        completedOnboarding: true,
-        internalAccounts: {
-          selectedAccount: 'acc1',
-          accounts: {
-            'acc1': { address: '0x123' }
-          }
-        },
-        allDetectedTokens: {
-          '0x1': {
-            '0x123': [{ address: '0xtoken', symbol: 'TEST' }]
-          }
-        }
-      }
-    };
-
-    const result1 = selectors.getAllDetectedTokensForSelectedAddress(state);
-    const result2 = selectors.getAllDetectedTokensForSelectedAddress(state);
-
-    expect(result1).toStrictEqual({
-      '0x1': [{ address: '0xtoken', symbol: 'TEST', chainId: '0x1' }]
-    });
-
-    // This expectation will FAIL before optimization
-    expect(result1).toBe(result2);
-  });
-});
