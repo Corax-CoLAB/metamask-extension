@@ -3000,30 +3000,34 @@ export function getAllDetectedTokens(state) {
  * @param {*} state
  * @returns list of token objects on all networks
  */
-export function getAllDetectedTokensForSelectedAddress(state) {
-  const completedOnboarding = getCompletedOnboarding(state);
-
-  if (!completedOnboarding) {
-    return {};
-  }
-
-  const { address: selectedAddress } = getSelectedInternalAccount(state);
-
-  const tokensByChainId = Object.entries(
-    state.metamask.allDetectedTokens || {},
-  ).reduce((acc, [chainId, chainTokens]) => {
-    const tokensForAddress = chainTokens[selectedAddress];
-    if (tokensForAddress) {
-      acc[chainId] = tokensForAddress.map((token) => ({
-        ...token,
-        chainId,
-      }));
+export const getAllDetectedTokensForSelectedAddress = createSelector(
+  getCompletedOnboarding,
+  getSelectedAddress,
+  getAllDetectedTokens,
+  (completedOnboarding, selectedAddress, allDetectedTokens) => {
+    if (!completedOnboarding || !selectedAddress || !allDetectedTokens) {
+      return EMPTY_OBJECT;
     }
-    return acc;
-  }, {});
 
-  return tokensByChainId;
-}
+    const tokensByChainId = Object.entries(allDetectedTokens).reduce(
+      (acc, [chainId, chainTokens]) => {
+        const tokensForAddress = chainTokens[selectedAddress];
+        if (tokensForAddress) {
+          acc[chainId] = tokensForAddress.map((token) => ({
+            ...token,
+            chainId,
+          }));
+        }
+        return acc;
+      },
+      {},
+    );
+
+    return Object.keys(tokensByChainId).length > 0
+      ? tokensByChainId
+      : EMPTY_OBJECT;
+  },
+);
 
 /**
  * To check if the token detection is OFF and the network is Mainnet
