@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import Fuse from 'fuse.js';
 import InputAdornment from '@material-ui/core/InputAdornment';
@@ -23,17 +23,27 @@ export default function SettingsSearch({
 
   const [searchIconColor, setSearchIconColor] = useState(IconColor.iconMuted);
 
-  const settingsRoutesListArray = Object.values(settingsRoutesList);
-  const settingsSearchFuse = new Fuse(settingsRoutesListArray, {
-    shouldSort: true,
-    threshold: 0.3,
-    location: 0,
-    distance: 100,
-    maxPatternLength: 32,
-    minMatchCharLength: 1,
-    keys: ['tabMessage', 'sectionMessage', 'descriptionMessage'],
-    getFn: (routeObject, path) => routeObject[path](t),
-  });
+  const settingsRoutesListArray = useMemo(
+    () => Object.values(settingsRoutesList),
+    [settingsRoutesList],
+  );
+
+  // Memoize the Fuse instance to prevent expensive indexing on every render.
+  // This significantly improves performance during search input typing.
+  const settingsSearchFuse = useMemo(
+    () =>
+      new Fuse(settingsRoutesListArray, {
+        shouldSort: true,
+        threshold: 0.3,
+        location: 0,
+        distance: 100,
+        maxPatternLength: 32,
+        minMatchCharLength: 1,
+        keys: ['tabMessage', 'sectionMessage', 'descriptionMessage'],
+        getFn: (routeObject, path) => routeObject[path](t),
+      }),
+    [settingsRoutesListArray, t],
+  );
 
   const handleSearch = (_searchQuery) => {
     const sanitizedSearchQuery = _searchQuery.trimStart();
