@@ -28,7 +28,8 @@ export default function SettingsSearch({
     [settingsRoutesList],
   );
 
-  // Memoize the Fuse instance to prevent expensive indexing on every render (optimization for search)
+  // Memoize the Fuse instance to prevent expensive indexing on every render.
+  // This is a performance optimization for search input typing.
   const settingsSearchFuse = useMemo(
     () =>
       new Fuse(settingsRoutesListArray, {
