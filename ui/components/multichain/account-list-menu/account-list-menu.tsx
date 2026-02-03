@@ -117,23 +117,25 @@ export const AccountListMenu = ({
 
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Memoize the Fuse instance to prevent expensive indexing on every render/keystroke.
+  const fuse = useMemo(() => {
+    return new Fuse(filteredAccounts, {
+      threshold: 0.2,
+      location: 0,
+      distance: 100,
+      maxPatternLength: 32,
+      minMatchCharLength: 1,
+      keys: ['metadata.name', 'address'],
+    });
+  }, [filteredAccounts]);
+
   const searchResults: MergedInternalAccount[] = useMemo(() => {
-    let _searchResults: MergedInternalAccount[] = filteredUpdatedAccountList;
     if (searchQuery) {
-      const fuse = new Fuse(filteredAccounts, {
-        threshold: 0.2,
-        location: 0,
-        distance: 100,
-        maxPatternLength: 32,
-        minMatchCharLength: 1,
-        keys: ['metadata.name', 'address'],
-      });
-      fuse.setCollection(filteredAccounts);
-      _searchResults = fuse.search(searchQuery);
+      return fuse.search(searchQuery);
     }
 
-    return _searchResults;
-  }, [filteredAccounts, filteredUpdatedAccountList, searchQuery]);
+    return filteredUpdatedAccountList;
+  }, [fuse, filteredUpdatedAccountList, searchQuery]);
 
   const defaultHomeActiveTabName: AccountOverviewTabKey = useSelector(
     getDefaultHomeActiveTabName,
