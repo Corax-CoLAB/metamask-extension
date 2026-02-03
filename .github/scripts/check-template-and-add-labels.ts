@@ -49,9 +49,10 @@ async function main(): Promise<void> {
   // We may also want to retrieve the list of organisations a user belongs to.
   // As a consequence, we need to create our own "LABEL_TOKEN" with "repo" and "read:org" permissions.
   // Such a token allows both to create new labels and fetch user's list of organisations.
-  const personalAccessToken = process.env.LABEL_TOKEN;
+  const personalAccessToken =
+    process.env.LABEL_TOKEN || process.env.GITHUB_TOKEN;
   if (!personalAccessToken) {
-    core.setFailed('LABEL_TOKEN not found');
+    core.setFailed('LABEL_TOKEN and GITHUB_TOKEN not found');
     process.exit(1);
   }
 
@@ -88,12 +89,23 @@ async function main(): Promise<void> {
   }
 
   // If author is not part of the MetaMask organisation
-  if (
-    !knownBots.includes(labelable?.author) &&
-    !(await userBelongsToMetaMaskOrg(octokit, labelable?.author))
-  ) {
-    // Add external contributor label to the issue
-    await addLabelToLabelable(octokit, labelable, externalContributorLabel);
+  if (!knownBots.includes(labelable?.author)) {
+    let isMetaMaskMember = false;
+    try {
+      isMetaMaskMember = await userBelongsToMetaMaskOrg(
+        octokit,
+        labelable?.author,
+      );
+    } catch (error) {
+      console.warn(
+        `Failed to check if user belongs to MetaMask org: ${error.message}. Assuming false.`,
+      );
+    }
+
+    if (!isMetaMaskMember) {
+      // Add external contributor label to the issue
+      await addLabelToLabelable(octokit, labelable, externalContributorLabel);
+    }
   }
 
   // Check if labelable's body matches one of the issue or PR templates ('general-issue.yml' or 'bug-report.yml' or 'pull-request-template.md').
