@@ -473,6 +473,13 @@ export function getAccountTypeForKeyring(keyring) {
   }
 }
 
+const selectBalancesForCurrentChain = createSelector(
+  (state) => state.metamask.accountsByChainId,
+  getCurrentChainId,
+  (accountsByChainId, currentChainId) =>
+    accountsByChainId?.[currentChainId] ?? EMPTY_OBJECT,
+);
+
 /**
  * Get account balances state.
  *
@@ -480,10 +487,8 @@ export function getAccountTypeForKeyring(keyring) {
  * @returns {object} A map of account addresses to account objects (which includes the account balance)
  */
 export const getMetaMaskAccountBalances = createSelector(
-  (state) => state.metamask.accountsByChainId,
-  getCurrentChainId,
-  (accountsByChainId, currentChainId) => {
-    const balancesForCurrentChain = accountsByChainId?.[currentChainId] ?? {};
+  selectBalancesForCurrentChain,
+  (balancesForCurrentChain) => {
     if (Object.keys(balancesForCurrentChain).length === 0) {
       return EMPTY_OBJECT;
     }
