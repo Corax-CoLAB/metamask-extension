@@ -98,7 +98,7 @@ async function main(): Promise<void> {
       );
     } catch (error) {
       console.warn(
-        `Failed to check if user belongs to MetaMask org: ${error.message}. Assuming false.`,
+        `Failed to check if user belongs to MetaMask org: ${(error as Error).message}. Assuming false.`,
       );
     }
 
