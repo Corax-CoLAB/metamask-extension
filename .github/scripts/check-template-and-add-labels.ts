@@ -96,7 +96,7 @@ async function main(): Promise<void> {
         octokit,
         labelable?.author,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         `Failed to check if user belongs to MetaMask org: ${error.message}. Assuming false.`,
       );
