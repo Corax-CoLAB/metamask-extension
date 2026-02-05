@@ -154,10 +154,10 @@ type NetworkListMenuProps = {
 
 // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const searchNetworks = <T,>(networks: T[], query: string) =>
-  query === ''
-    ? networks
-    : new Fuse(networks, {
+const useNetworkSearch = <T,>(networks: T[], query: string) => {
+  const fuse = useMemo(
+    () =>
+      new Fuse(networks, {
         threshold: 0.2,
         location: 0,
         distance: 100,
@@ -165,7 +165,14 @@ const searchNetworks = <T,>(networks: T[], query: string) =>
         minMatchCharLength: 1,
         shouldSort: false, // Maintain network order instead of ordering by search score
         keys: ['name', 'chainId', 'nativeCurrency'],
-      }).search(query);
+      }),
+    [networks],
+  );
+
+  return useMemo(() => {
+    return query === '' ? networks : fuse.search(query);
+  }, [fuse, networks, query]);
+};
 
 export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
   const t = useI18nContext();
@@ -325,14 +332,14 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
   const [focusSearch, setFocusSearch] = useState(false);
 
   // Memoize search results to prevent creating new Fuse instances and running search on every render
-  const searchedEnabledNetworks = useMemo(
-    () => searchNetworks(orderedNetworks, searchQuery),
-    [orderedNetworks, searchQuery],
+  const searchedEnabledNetworks = useNetworkSearch(
+    orderedNetworks,
+    searchQuery,
   );
 
-  const searchedFeaturedNetworks = useMemo(
-    () => searchNetworks(featuredNetworksNotYetEnabled, searchQuery),
-    [featuredNetworksNotYetEnabled, searchQuery],
+  const searchedFeaturedNetworks = useNetworkSearch(
+    featuredNetworksNotYetEnabled,
+    searchQuery,
   );
 
   const testNetworksValues = useMemo(
@@ -340,9 +347,9 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
     [testNetworks],
   );
 
-  const searchedTestNetworks = useMemo(
-    () => searchNetworks(testNetworksValues, searchQuery),
-    [testNetworksValues, searchQuery],
+  const searchedTestNetworks = useNetworkSearch(
+    testNetworksValues,
+    searchQuery,
   );
   // A sorted list of test networks that put Sepolia first then Linea Sepolia at the top
   // and the rest of the test networks in alphabetical order.
