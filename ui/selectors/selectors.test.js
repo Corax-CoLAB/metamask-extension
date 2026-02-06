@@ -1040,6 +1040,12 @@ describe('Selectors', () => {
     );
   });
 
+  it('returns memoized results for accountsWithSendEtherInfoSelector when state is unchanged', () => {
+    const result1 = selectors.accountsWithSendEtherInfoSelector(mockState);
+    const result2 = selectors.accountsWithSendEtherInfoSelector(mockState);
+    expect(result1).toBe(result2);
+  });
+
   it('returns selected account with balance, address, and name from accountsWithSendEtherInfoSelector', () => {
     const currentAccountwithSendEther =
       selectors.getCurrentAccountWithSendEtherInfo(mockState);
