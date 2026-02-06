@@ -1041,6 +1041,7 @@ describe('Selectors', () => {
   });
 
   it('returns memoized results for accountsWithSendEtherInfoSelector when state is unchanged', () => {
+    // Check referential equality to ensure memoization works
     const result1 = selectors.accountsWithSendEtherInfoSelector(mockState);
     const result2 = selectors.accountsWithSendEtherInfoSelector(mockState);
     expect(result1).toBe(result2);
