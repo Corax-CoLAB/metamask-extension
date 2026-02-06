@@ -184,6 +184,7 @@ import { getHasShieldEntryModalShownOnce } from './subscription';
 
 // Re-export this file so we don't have to update all references
 // TODO: Update all references
+// Note: This pattern handles legacy selector location
 export {
   getEnabledNetworks,
   getIsBitcoinSupportEnabled,
@@ -1228,21 +1229,18 @@ export function getAccountName(accounts, accountAddress) {
   return account && account.metadata.name !== '' ? account.metadata.name : '';
 }
 
-export function accountsWithSendEtherInfoSelector(state) {
-  const accounts = getMetaMaskAccounts(state);
-  const internalAccounts = getInternalAccounts(state);
-
-  const accountsWithSendEtherInfo = Object.values(internalAccounts).map(
-    (internalAccount) => {
+export const accountsWithSendEtherInfoSelector = createSelector(
+  getMetaMaskAccounts,
+  getInternalAccounts,
+  (accounts, internalAccounts) => {
+    return Object.values(internalAccounts).map((internalAccount) => {
       return {
         ...internalAccount,
         ...accounts[internalAccount.address],
       };
-    },
-  );
-
-  return accountsWithSendEtherInfo;
-}
+    });
+  },
+);
 
 export const getAccountsWithLabels = createSelector(
   getMetaMaskAccountsOrdered,
