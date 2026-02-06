@@ -184,6 +184,7 @@ import { getHasShieldEntryModalShownOnce } from './subscription';
 
 // Re-export this file so we don't have to update all references
 // TODO: Update all references
+// Note: This pattern handles legacy selector location
 export {
   getEnabledNetworks,
   getIsBitcoinSupportEnabled,
