@@ -24,4 +24,5 @@ jobs:
         id: check-template-and-add-labels
         env:
           LABEL_TOKEN: ${{ secrets.LABEL_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run check-template-and-add-labels
