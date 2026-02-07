@@ -296,57 +296,6 @@ export const transactionsSelectorAllChains = createSelector(
 );
 
 /**
- * @name insertOrderedNonce
- * @private
- * @description Inserts (mutates) a nonce into an array of ordered nonces, sorted in ascending
- * order.
- * @param {string[]} nonces - Array of nonce strings in hex
- * @param {string} nonceToInsert - Nonce string in hex to be inserted into the array of nonces.
- */
-const insertOrderedNonce = (nonces, nonceToInsert) => {
-  let insertIndex = nonces.length;
-
-  for (let i = 0; i < nonces.length; i++) {
-    const nonce = nonces[i];
-
-    if (
-      Number(hexToDecimal(nonce.split('-')[0])) >
-      Number(hexToDecimal(nonceToInsert.split('-')[0]))
-    ) {
-      insertIndex = i;
-      break;
-    }
-  }
-
-  nonces.splice(insertIndex, 0, nonceToInsert);
-};
-
-/**
- * @name insertTransactionByTime
- * @private
- * @description Inserts (mutates) a transaction object into an array of ordered transactions, sorted
- * in ascending order by time.
- * @param {object[]} transactions - Array of transaction objects.
- * @param {object} transaction - Transaction object to be inserted into the array of transactions.
- */
-const insertTransactionByTime = (transactions, transaction) => {
-  const { time } = transaction;
-
-  let insertIndex = transactions.length;
-
-  for (let i = 0; i < transactions.length; i++) {
-    const tx = transactions[i];
-
-    if (tx.time > time) {
-      insertIndex = i;
-      break;
-    }
-  }
-
-  transactions.splice(insertIndex, 0, transaction);
-};
-
-/**
  * Contains transactions and properties associated with those transactions of the same nonce.
  *
  * @typedef {object} transactionGroup
@@ -406,25 +355,145 @@ const mergeNonNonceTransactionGroups = (
   });
 };
 
+const INVALID_INITIAL_TRANSACTION_TYPES = [
+  TransactionType.cancel,
+  TransactionType.retry,
+];
+
+// Helper to calculate group properties from sorted transactions
+const createTransactionGroup = (nonce, transactions) => {
+  const nonceProps = {
+    nonce,
+    transactions,
+    initialTransaction: transactions[0],
+    primaryTransaction: transactions[0],
+    hasRetried: false,
+    hasCancelled: false,
+  };
+
+  for (let i = 0; i < transactions.length; i++) {
+    const transaction = transactions[i];
+    const { status, type, time: txTime, txReceipt } = transaction;
+
+    const currentTransaction = {
+      // A on-chain failure means the current transaction was submitted and
+      // considered for inclusion in a block but something prevented it
+      // from being included, such as slippage on gas prices and conversion
+      // when doing a swap. These transactions will have a '0x0' value in
+      // the txReceipt.status field.
+      isOnChainFailure: txReceipt?.status === '0x0',
+      // Another type of failure is a "off chain" or "network" failure,
+      // where the error occurs on the JSON RPC call to the network client
+      // (Like Infura). These transactions are never broadcast for
+      // inclusion and the nonce associated with them is not consumed. When
+      // this occurs  the next transaction will have the same nonce as the
+      // current, failed transaction. A failed on chain transaction will
+      // not have the FAILED status although it should (future TODO: add a
+      // new FAILED_ON_CHAIN) status. I use the word "Ephemeral" here
+      // because a failed transaction that does not get broadcast is not
+      // known outside of the user's local MetaMask and the nonce
+      // associated will be applied to the next.
+      isEphemeral:
+        status === TransactionStatus.failed && txReceipt?.status !== '0x0',
+      // We never want to use a speed up (retry) or cancel as the initial
+      // transaction in a group, regardless of time order. This is because
+      // useTransactionDisplayData cannot parse a retry or cancel because
+      // it lacks information on whether it's a simple send, token transfer,
+      // etc.
+      isRetryOrCancel: INVALID_INITIAL_TRANSACTION_TYPES.includes(type),
+      // Primary transactions usually are the latest transaction by time,
+      // but not always. This value shows whether this transaction occurred
+      // after the current primary.
+      occurredAfterPrimary: txTime > (nonceProps.primaryTransaction.time || 0),
+      // Priority Statuses are those that are either already confirmed
+      // on-chain, submitted to the network, or waiting for user approval.
+      // These statuses typically indicate a transaction that needs to have
+      // its status reflected in the UI.
+      hasPriorityStatus: status in PRIORITY_STATUS_HASH,
+      // A confirmed transaction is the most valid transaction status to
+      // display because no other transaction of the same nonce can have a
+      // more valid status.
+      isConfirmed: status === TransactionStatus.confirmed,
+      // Initial transactions usually are the earliest transaction by time,
+      // but not always. This value shows whether this transaction occurred
+      // before the current initial.
+      occurredBeforeInitial: txTime < (nonceProps.initialTransaction.time || 0),
+      // We only allow users to retry the transaction in certain scenarios
+      // to help shield from expensive operations and other unwanted side
+      // effects. This value is used to determine if the entire transaction
+      // group should be marked as having had a retry.
+      isValidRetry:
+        type === TransactionType.retry &&
+        (status in PRIORITY_STATUS_HASH ||
+          status === TransactionStatus.dropped),
+      // We only allow users to cancel the transaction in certain scenarios
+      // to help shield from expensive operations and other unwanted side
+      // effects. This value is used to determine if the entire transaction
+      // group should be marked as having had a cancel.
+      isValidCancel:
+        type === TransactionType.cancel &&
+        (status in PRIORITY_STATUS_HASH ||
+          status === TransactionStatus.dropped),
+      eligibleForInitial:
+        !INVALID_INITIAL_TRANSACTION_TYPES.includes(type) &&
+        status !== TransactionStatus.failed,
+      shouldBePrimary:
+        status === TransactionStatus.confirmed || txReceipt?.status === '0x0',
+    };
+
+    const previousPrimaryTransaction = {
+      isEphemeral:
+        nonceProps.primaryTransaction.status === TransactionStatus.failed &&
+        nonceProps.primaryTransaction?.txReceipt?.status !== '0x0',
+    };
+
+    const previousInitialTransaction = {
+      isEphemeral:
+        nonceProps.initialTransaction.status === TransactionStatus.failed &&
+        nonceProps.initialTransaction.txReceipt?.status !== '0x0',
+    };
+
+    if (
+      currentTransaction.shouldBePrimary ||
+      previousPrimaryTransaction.isEphemeral ||
+      (currentTransaction.occurredAfterPrimary &&
+        currentTransaction.hasPriorityStatus)
+    ) {
+      nonceProps.primaryTransaction = transaction;
+    }
+
+    if (
+      (currentTransaction.occurredBeforeInitial &&
+        currentTransaction.eligibleForInitial) ||
+      (previousInitialTransaction.isEphemeral &&
+        currentTransaction.eligibleForInitial)
+    ) {
+      nonceProps.initialTransaction = transaction;
+    }
+
+    if (currentTransaction.isValidRetry) {
+      nonceProps.hasRetried = true;
+    }
+
+    if (currentTransaction.isValidCancel) {
+      nonceProps.hasCancelled = true;
+    }
+  }
+
+  return nonceProps;
+};
+
 export const groupAndSortTransactionsByNonce = (transactions) => {
   const unapprovedTransactionGroups = [];
   const incomingTransactionGroups = [];
-  const orderedNonces = [];
   const nonceToTransactionsMap = {};
-
-  const INVALID_INITIAL_TRANSACTION_TYPES = [
-    TransactionType.cancel,
-    TransactionType.retry,
-  ];
+  const orderedNoncesSet = new Set();
 
   transactions.forEach((transaction) => {
     const {
       networkClientId,
       txParams: { nonce } = {},
-      status,
       type,
-      time: txTime,
-      txReceipt,
     } = transaction;
 
     const nonceNetworkKey = `${nonce}-${networkClientId}`;
@@ -447,145 +516,34 @@ export const groupAndSortTransactionsByNonce = (transactions) => {
       if (type === TransactionType.incoming) {
         incomingTransactionGroups.push(transactionGroup);
       } else {
-        insertTransactionGroupByTime(
-          unapprovedTransactionGroups,
-          transactionGroup,
-        );
-      }
-    } else if (nonceNetworkKey in nonceToTransactionsMap) {
-      const nonceProps = nonceToTransactionsMap[nonceNetworkKey];
-      insertTransactionByTime(nonceProps.transactions, transaction);
-
-      const {
-        primaryTransaction: { time: primaryTxTime = 0 } = {},
-        initialTransaction: { time: initialTxTime = 0 } = {},
-      } = nonceProps;
-
-      const currentTransaction = {
-        // A on-chain failure means the current transaction was submitted and
-        // considered for inclusion in a block but something prevented it
-        // from being included, such as slippage on gas prices and conversion
-        // when doing a swap. These transactions will have a '0x0' value in
-        // the txReceipt.status field.
-        isOnChainFailure: txReceipt?.status === '0x0',
-        // Another type of failure is a "off chain" or "network" failure,
-        // where the error occurs on the JSON RPC call to the network client
-        // (Like Infura). These transactions are never broadcast for
-        // inclusion and the nonce associated with them is not consumed. When
-        // this occurs  the next transaction will have the same nonce as the
-        // current, failed transaction. A failed on chain transaction will
-        // not have the FAILED status although it should (future TODO: add a
-        // new FAILED_ON_CHAIN) status. I use the word "Ephemeral" here
-        // because a failed transaction that does not get broadcast is not
-        // known outside of the user's local MetaMask and the nonce
-        // associated will be applied to the next.
-        isEphemeral:
-          status === TransactionStatus.failed && txReceipt?.status !== '0x0',
-        // We never want to use a speed up (retry) or cancel as the initial
-        // transaction in a group, regardless of time order. This is because
-        // useTransactionDisplayData cannot parse a retry or cancel because
-        // it lacks information on whether it's a simple send, token transfer,
-        // etc.
-        isRetryOrCancel: INVALID_INITIAL_TRANSACTION_TYPES.includes(type),
-        // Primary transactions usually are the latest transaction by time,
-        // but not always. This value shows whether this transaction occurred
-        // after the current primary.
-        occurredAfterPrimary: txTime > primaryTxTime,
-        // Priority Statuses are those that are either already confirmed
-        // on-chain, submitted to the network, or waiting for user approval.
-        // These statuses typically indicate a transaction that needs to have
-        // its status reflected in the UI.
-        hasPriorityStatus: status in PRIORITY_STATUS_HASH,
-        // A confirmed transaction is the most valid transaction status to
-        // display because no other transaction of the same nonce can have a
-        // more valid status.
-        isConfirmed: status === TransactionStatus.confirmed,
-        // Initial transactions usually are the earliest transaction by time,
-        // but not always. This value shows whether this transaction occurred
-        // before the current initial.
-        occurredBeforeInitial: txTime < initialTxTime,
-        // We only allow users to retry the transaction in certain scenarios
-        // to help shield from expensive operations and other unwanted side
-        // effects. This value is used to determine if the entire transaction
-        // group should be marked as having had a retry.
-        isValidRetry:
-          type === TransactionType.retry &&
-          (status in PRIORITY_STATUS_HASH ||
-            status === TransactionStatus.dropped),
-        // We only allow users to cancel the transaction in certain scenarios
-        // to help shield from expensive operations and other unwanted side
-        // effects. This value is used to determine if the entire transaction
-        // group should be marked as having had a cancel.
-        isValidCancel:
-          type === TransactionType.cancel &&
-          (status in PRIORITY_STATUS_HASH ||
-            status === TransactionStatus.dropped),
-        eligibleForInitial:
-          !INVALID_INITIAL_TRANSACTION_TYPES.includes(type) &&
-          status !== TransactionStatus.failed,
-        shouldBePrimary:
-          status === TransactionStatus.confirmed || txReceipt?.status === '0x0',
-      };
-
-      const previousPrimaryTransaction = {
-        isEphemeral:
-          nonceProps.primaryTransaction.status === TransactionStatus.failed &&
-          nonceProps.primaryTransaction?.txReceipt?.status !== '0x0',
-      };
-
-      const previousInitialTransaction = {
-        isEphemeral:
-          nonceProps.initialTransaction.status === TransactionStatus.failed &&
-          nonceProps.initialTransaction.txReceipt?.status !== '0x0',
-      };
-
-      if (
-        currentTransaction.shouldBePrimary ||
-        previousPrimaryTransaction.isEphemeral ||
-        (currentTransaction.occurredAfterPrimary &&
-          currentTransaction.hasPriorityStatus)
-      ) {
-        nonceProps.primaryTransaction = transaction;
-      }
-
-      if (
-        (currentTransaction.occurredBeforeInitial &&
-          currentTransaction.eligibleForInitial) ||
-        (previousInitialTransaction.isEphemeral &&
-          currentTransaction.eligibleForInitial)
-      ) {
-        nonceProps.initialTransaction = transaction;
-      }
-
-      if (currentTransaction.isValidRetry) {
-        nonceProps.hasRetried = true;
-      }
-
-      if (currentTransaction.isValidCancel) {
-        nonceProps.hasCancelled = true;
+        unapprovedTransactionGroups.push(transactionGroup);
       }
     } else {
-      nonceToTransactionsMap[nonceNetworkKey] = {
-        nonce,
-        transactions: [transaction],
-        initialTransaction: transaction,
-        primaryTransaction: transaction,
-        hasRetried:
-          type === TransactionType.retry &&
-          (status in PRIORITY_STATUS_HASH ||
-            status === TransactionStatus.dropped),
-        hasCancelled:
-          type === TransactionType.cancel &&
-          (status in PRIORITY_STATUS_HASH ||
-            status === TransactionStatus.dropped),
-      };
-      insertOrderedNonce(orderedNonces, nonceNetworkKey);
+      if (!nonceToTransactionsMap[nonceNetworkKey]) {
+        nonceToTransactionsMap[nonceNetworkKey] = [];
+        orderedNoncesSet.add(nonceNetworkKey);
+      }
+      nonceToTransactionsMap[nonceNetworkKey].push(transaction);
     }
   });
 
-  const orderedTransactionGroups = orderedNonces.map(
-    (nonce) => nonceToTransactionsMap[nonce],
-  );
+  const sortByTimeAsc = (a, b) =>
+    (a.primaryTransaction.time || 0) - (b.primaryTransaction.time || 0);
+  unapprovedTransactionGroups.sort(sortByTimeAsc);
+  incomingTransactionGroups.sort(sortByTimeAsc);
+
+  const orderedNonces = Array.from(orderedNoncesSet).sort((a, b) => {
+    const nonceA = hexToDecimal(a.split('-')[0]);
+    const nonceB = hexToDecimal(b.split('-')[0]);
+    return Number(nonceA) - Number(nonceB);
+  });
+
+  const orderedTransactionGroups = orderedNonces.map((nonceKey) => {
+    const txs = nonceToTransactionsMap[nonceKey];
+    txs.sort((a, b) => a.time - b.time);
+    return createTransactionGroup(txs[0].txParams.nonce, txs);
+  });
+
   mergeNonNonceTransactionGroups(
     orderedTransactionGroups,
     incomingTransactionGroups,
