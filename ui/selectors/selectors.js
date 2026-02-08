@@ -503,39 +503,36 @@ export const getMetaMaskAccountBalances = createSelector(
   },
 );
 
-export const getMetaMaskCachedBalances = createSelector(
-  (state) => state.metamask.accountsByChainId,
+const getTargetChainIdForCachedBalances = createSelector(
   getEnabledNetworks,
   getCurrentChainId,
   (_, networkChainId) => networkChainId,
-  (accountsByChainId, enabledNetworks, currentChainId, networkChainId) => {
+  (enabledNetworks, currentChainId, networkChainId) => {
     const eip155 = enabledNetworks?.eip155 ?? {};
     const enabledIds = Object.keys(eip155).filter((id) => Boolean(eip155[id]));
     if (enabledIds.length === 1) {
-      const chainId = enabledIds[0];
-      if (Object.keys(accountsByChainId?.[chainId] ?? {}).length === 0) {
-        return EMPTY_OBJECT;
-      }
-      return Object.entries(accountsByChainId[chainId]).reduce(
-        (accumulator, [key, value]) => {
-          accumulator[key.toLowerCase()] = value.balance;
-          return accumulator;
-        },
-        {},
-      );
+      return enabledIds[0];
     }
+    return networkChainId ?? currentChainId;
+  },
+);
 
-    const chainId = networkChainId ?? currentChainId;
-    if (Object.keys(accountsByChainId?.[chainId] ?? {}).length === 0) {
+const getAccountsForTargetChain = createSelector(
+  (state) => state.metamask.accountsByChainId,
+  getTargetChainIdForCachedBalances,
+  (accountsByChainId, chainId) => accountsByChainId?.[chainId] ?? EMPTY_OBJECT,
+);
+
+export const getMetaMaskCachedBalances = createSelector(
+  getAccountsForTargetChain,
+  (chainAccounts) => {
+    if (Object.keys(chainAccounts).length === 0) {
       return EMPTY_OBJECT;
     }
-    return Object.entries(accountsByChainId[chainId]).reduce(
-      (accumulator, [key, value]) => {
-        accumulator[key.toLowerCase()] = value.balance;
-        return accumulator;
-      },
-      {},
-    );
+    return Object.entries(chainAccounts).reduce((accumulator, [key, value]) => {
+      accumulator[key.toLowerCase()] = value.balance;
+      return accumulator;
+    }, {});
   },
 );
 
